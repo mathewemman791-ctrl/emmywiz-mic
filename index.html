@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EmmyWIZ Voice</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#0b0b0f;
+  color:#fff;
+  font:16px Arial,sans-serif;
+  flex-direction:column;
+  text-align:center
+}
+button{
+  font-size:60px;
+  background:none;
+  border:0;
+  color:#fff;
+  cursor:pointer
+}
+p{opacity:.7}
+</style>
+</head>
+<body>
+
+<button id="btn" onclick="toggle()">🎙</button>
+<p id="status">Starting…</p>
+
+<script>
+let recorder=null,chunks=[],stream=null;
+
+async function toggle(){
+
+  if(recorder&&recorder.state==='recording'){
+    recorder.stop();
+    return;
+  }
+
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:true});
+  }catch(e){
+    document.getElementById('status').textContent='Microphone permission denied.';
+    return;
+  }
+
+  chunks=[];
+  recorder=new MediaRecorder(stream);
+
+  recorder.ondataavailable=e=>{
+    if(e.data&&e.data.size>0)chunks.push(e.data);
+  };
+
+  recorder.onstop=onStop;
+
+  recorder.start();
+
+  document.getElementById('btn').textContent='⏹';
+  document.getElementById('status').textContent='Recording… tap to stop';
+}
+
+
+function onStop(){
+
+  if(stream){
+    stream.getTracks().forEach(t=>t.stop());
+  }
+
+  document.getElementById('status').textContent='Sending…';
+
+  let blob=new Blob(chunks,{type:'audio/webm'});
+  let r=new FileReader();
+
+  r.onload=()=>{
+
+    let b64=String(r.result).split(',')[1]||'';
+
+    if(window.opener){
+      window.opener.postMessage(
+        {type:'emmywiz-audio',data:b64,mime:'audio/webm'},
+        '*'
+      );
+    }
+
+    document.getElementById('status').textContent='Done. Closing…';
+
+    setTimeout(()=>window.close(),600);
+  };
+
+  r.readAsDataURL(blob);
+}
+
+toggle();
+</script>
+</body>
+  </html>
